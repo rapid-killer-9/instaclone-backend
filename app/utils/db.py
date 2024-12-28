@@ -1,9 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
-import os
+from app.config.settings import DATABASE_URL
 
-load_dotenv()
+async def get_database():
+    client = AsyncIOMotorClient(DATABASE_URL)
+    return client.get_database()
 
-MONGO_URI = os.getenv("MONGO_URI")
-client = AsyncIOMotorClient(MONGO_URI)
-db = client["instaclone"]
+def serialize_document(document):
+    if not document:
+        return None
+    document["_id"] = str(document["_id"])
+    return document

@@ -3,7 +3,7 @@ from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
 
-# Enum for Post Categories
+
 class PostCategory(str, Enum):
     tech = "Tech"
     entertainment = "Entertainment"
@@ -14,7 +14,6 @@ class PostCategory(str, Enum):
     education = "Education"
 
 
-# Comment model
 class Comment(BaseModel):
     user_id: str  
     text: str  
@@ -53,6 +52,13 @@ class GetUserProfileRequest(BaseModel):
 class UpdateUserProfileRequest(BaseModel):
     user_id: str
     update_data: Dict
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class VerifyTokenRequest(BaseModel):
+    token: str
 
 
 class Post(BaseModel):

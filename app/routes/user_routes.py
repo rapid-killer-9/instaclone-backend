@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body
 from app.services.user_service import create_user, get_user_by_email, get_user_by_username, update_user
 from app.utils.validator import validate_email, validate_username, validate_string_length
-from app.models import User, GetUserByEmailRequest, GetUserProfileRequest, UpdateUserProfileRequest
+from app.models.pydantic import User, GetUserByEmailRequest, GetUserProfileRequest, UpdateUserProfileRequest
 
 router = APIRouter()
 

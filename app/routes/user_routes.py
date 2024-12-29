@@ -41,6 +41,8 @@ async def get_user_profile(data: GetUserProfileRequest):
         user = await get_user_by_username(username)
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
+        user.pop("password")
+        user.pop("email")
         return {"user_profile": user}
     except Exception as e:
         print(f"Unexpected error: {e}")

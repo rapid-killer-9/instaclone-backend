@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body, Depends
 from app.utils.auth import get_current_user
 from app.models.pydantic import UpdateUserProfileRequest
-from app.utils.validator import validate_email, validate_username, validate_string_length
+from app.utils.validator import validate_email, validate_username, validate_string_length, validate_password
 from app.services.user_service import (
     get_user_by_email, 
     get_user_by_username, 
@@ -39,17 +39,19 @@ async def get_user_profile(username: str):
         print(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
+# protected route to update user profile fetch user id from token
+# and not allow to update other user profile
 @router.put("/profile/update")
-async def update_user_profile(data: UpdateUserProfileRequest):
-    user_id = data.user_id  
+async def update_user_profile(data: UpdateUserProfileRequest, user_id: str = Depends(get_current_user)):
     update_data = data.update_data
+    user_id = user_id["_id"]
     try:
         if not update_data:
             raise HTTPException(status_code=400, detail="No data provided for update.")
-        if "password" in update_data:
-            raise HTTPException(status_code=400, detail="Password cannot be updated.")
         if "full_name" in update_data and not validate_string_length(update_data["full_name"], min_len=1, max_len=100):
             raise HTTPException(status_code=400, detail="Full name length must be between 1 and 100 characters.")
+        if "password" in update_data and not validate_password(update_data["password"]):
+            raise HTTPException(status_code=400, detail="Invalid password format.")
         if "username" in update_data and not validate_username(update_data["username"]):
             raise HTTPException(status_code=400, detail="Invalid username format.")
         if "email" in update_data and not validate_email(update_data["email"]):

@@ -1,29 +1,5 @@
 from app.utils.db import get_database, serialize_document
-from typing import Optional
 from bson import ObjectId
-import bcrypt
-
-async def create_user(email: str, password: str, full_name: Optional[str], username: str):
-    db = await get_database()
-    
-    # Check if email or username already exists
-    if await db.users.find_one({"email": email}):
-        raise ValueError("Email already in use.")
-    if await db.users.find_one({"username": username}):
-        raise ValueError("Username already in use.")
-
-    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    
-    user_data = {
-        "email": email,
-        "password": hashed_password.decode('utf-8'),
-        "full_name": full_name,
-        "username": username,
-    }
-    
-    result = await db.users.insert_one(user_data)
-    user_data["_id"] = str(result.inserted_id)
-    return user_data
 
 async def get_user_by_email(email: str):
     db = await get_database()
@@ -41,8 +17,69 @@ async def update_user(user_id: str, update_data: dict):
         raise ValueError("Invalid user ID format.")
     
     updated_user = await db.users.find_one_and_update(
-        {"_id": ObjectId(user_id)},  # Convert string ID to ObjectId
+        {"_id": ObjectId(user_id)},  
         {"$set": update_data},
         return_document=True
     )
     return serialize_document(updated_user)
+
+async def follow_user(user_id: str, follow_user_id: str):
+    db = await get_database()
+    if not ObjectId.is_valid(user_id) or not ObjectId.is_valid(follow_user_id):
+        raise ValueError("Invalid user ID format.")
+    
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$addToSet": {"following": ObjectId(follow_user_id)}}
+    )
+    await db.users.update_one(
+        {"_id": ObjectId(follow_user_id)},
+        {"$addToSet": {"followers": ObjectId(user_id)}}
+    )
+
+async def unfollow_user(user_id: str, unfollow_user_id: str):
+    db = await get_database()
+    if not ObjectId.is_valid(user_id) or not ObjectId.is_valid(unfollow_user_id):
+        raise ValueError("Invalid user ID format.")
+    
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$pull": {"following": ObjectId(unfollow_user_id)}}
+    )
+    await db.users.update_one(
+        {"_id": ObjectId(unfollow_user_id)},
+        {"$pull": {"followers": ObjectId(user_id)}}
+    )
+
+async def get_followers(user_id: str):
+    db = await get_database()
+    if not ObjectId.is_valid(user_id):
+        raise ValueError("Invalid user ID format.")
+    
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    followers = await db.users.find({"_id": {"$in": user["followers"]}}).to_list(length=None)
+    updated_followers = []
+    for follower in followers:
+        updated_followers.append({
+            "username": follower["username"],
+            "full_name": follower["full_name"],
+            "_id": str(follower["_id"])
+        })
+    return updated_followers
+
+async def get_following(user_id: str):
+    db = await get_database()
+    if not ObjectId.is_valid(user_id):
+        raise ValueError("Invalid user ID format.")
+    
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    following = await db.users.find({"_id": {"$in": user["following"]}}).to_list(length=None)
+    updated_following = []
+    for follow_user in following:
+        updated_following.append({
+            "username": follow_user["username"],
+            "full_name": follow_user["full_name"],
+            "_id": str(follow_user["_id"])
+        })
+    return updated_following
+

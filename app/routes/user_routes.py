@@ -1,48 +1,39 @@
-from fastapi import APIRouter, HTTPException, Body
-from app.services.user_service import create_user, get_user_by_email, get_user_by_username, update_user
+from fastapi import APIRouter, HTTPException, Body, Depends
+from app.utils.auth import get_current_user
+from app.models.pydantic import UpdateUserProfileRequest
 from app.utils.validator import validate_email, validate_username, validate_string_length
-from app.models.pydantic import User, GetUserByEmailRequest, GetUserProfileRequest, UpdateUserProfileRequest
+from app.services.user_service import (
+    get_user_by_email, 
+    get_user_by_username, 
+    update_user, 
+    follow_user, 
+    unfollow_user, 
+    get_followers, 
+    get_following
+)
 
 router = APIRouter()
 
-@router.post("/create")
-async def create_new_user(user: User):
-    try:
-        if not validate_email(user.email):
-            raise HTTPException(status_code=400, detail="Invalid email.")
-        if not validate_username(user.username):
-            raise HTTPException(status_code=400, detail="Invalid username.")
-        
-        user_data = await create_user(user.email, user.password, user.full_name, user.username)
-        user_data.pop("password")
-        return {"message": "User created successfully.", "user": user_data}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
-
-@router.post("/get-by-email")
-async def get_user_by_email_route(data: GetUserByEmailRequest):
-    email = data.email
+@router.get("/get-by-email")
+async def get_user_by_email_route(email: str):
     try:
         user = await get_user_by_email(email)
-        user.pop("password")
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
+        user.pop("password", None)  
         return {"user": user}
     except Exception as e:
         print(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
-@router.post("/profile")
-async def get_user_profile(data: GetUserProfileRequest):
-    username = data.username
+
+@router.get("/profile/{username}")
+async def get_user_profile(username: str):
     try:
         user = await get_user_by_username(username)
         if not user:
             raise HTTPException(status_code=404, detail="User not found.")
-        user.pop("password")
+        user.pop("password", None)  # Use pop with default to avoid KeyError
         return {"user_profile": user}
     except Exception as e:
         print(f"Unexpected error: {e}")
@@ -55,16 +46,14 @@ async def update_user_profile(data: UpdateUserProfileRequest):
     try:
         if not update_data:
             raise HTTPException(status_code=400, detail="No data provided for update.")
-        if "email" in update_data:
-            raise HTTPException(status_code=400, detail="Email cannot be updated.")
         if "password" in update_data:
             raise HTTPException(status_code=400, detail="Password cannot be updated.")
         if "full_name" in update_data and not validate_string_length(update_data["full_name"], min_len=1, max_len=100):
             raise HTTPException(status_code=400, detail="Full name length must be between 1 and 100 characters.")
-        if "name" in update_data and not validate_string_length(update_data["name"], min_len=1, max_len=100):
-            raise HTTPException(status_code=400, detail="Name length must be between 1 and 100 characters.")
         if "username" in update_data and not validate_username(update_data["username"]):
             raise HTTPException(status_code=400, detail="Invalid username format.")
+        if "email" in update_data and not validate_email(update_data["email"]):
+            raise HTTPException(status_code=400, detail="Invalid email format.")
         
         updated_user = await update_user(user_id, update_data)
         updated_user.pop("password")
@@ -74,6 +63,77 @@ async def update_user_profile(data: UpdateUserProfileRequest):
         return {"message": "User profile updated.", "user": updated_user}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+
+@router.post("/follow/")
+async def follow_user_route(target_user_id: str, current_user: str = Depends(get_current_user)):
+    try:
+        await follow_user(current_user["_id"], target_user_id)
+        return {"message": "User followed successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+@router.post("/follow/{username}")
+async def follow_user_by_username(username: str, current_user: str = Depends(get_current_user)):
+    try:
+        target_user = await get_user_by_username(username)
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        await follow_user(current_user["_id"], target_user["_id"])
+        return {"message": "User followed successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+
+@router.post("/unfollow/")
+async def unfollow_user_route(target_user_id: str, current_user: str = Depends(get_current_user)):
+    try:
+        await unfollow_user(current_user["_id"], target_user_id)
+        return {"message": "User unfollowed successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+@router.post("/unfollow/{username}")
+async def unfollow_user_by_username(username: str, current_user: str = Depends(get_current_user)):
+    try:
+        target_user = await get_user_by_username(username)
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found.")
+        await unfollow_user(current_user["_id"], target_user["_id"])
+        return {"message": "User unfollowed successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+
+@router.get("/{user_id}/followers")
+async def get_followers_route(user_id: str):
+    try:
+        followers = await get_followers(user_id)
+        return {"followers": followers}
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+
+@router.get("/{user_id}/following")
+async def get_following_route(user_id: str):
+    try:
+        following = await get_following(user_id)
+        return {"following": following}
     except Exception as e:
         print(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")

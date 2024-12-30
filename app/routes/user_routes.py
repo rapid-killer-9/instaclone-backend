@@ -123,7 +123,7 @@ async def unfollow_user_by_username(username: str, current_user: str = Depends(g
 @router.get("/{user_id}/followers")
 async def get_followers_route(user_id: str = Depends(get_current_user)):
     try:
-        followers = await get_followers(user_id)
+        followers = await get_followers(user_id["_id"])
         return {"followers": followers}
     except Exception as e:
         print(f"Unexpected error: {e}")
@@ -132,7 +132,7 @@ async def get_followers_route(user_id: str = Depends(get_current_user)):
 @router.get("/{user_id}/following")
 async def get_following_route(user_id: str = Depends(get_current_user)):
     try:
-        following = await get_following(user_id)
+        following = await get_following(user_id["_id"])
         return {"following": following}
     except Exception as e:
         print(f"Unexpected error: {e}")

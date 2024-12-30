@@ -1,4 +1,3 @@
-# from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -28,7 +27,6 @@ class UserDB:
         email: str,
         password: str,
         full_name: Optional[str] = None,
-        profile_picture: Optional[str] = None,
         posts: Optional[List[str]] = None,
         followers: Optional[List[str]] = None,
         following: Optional[List[str]] = None,
@@ -37,7 +35,6 @@ class UserDB:
         self.email = email
         self.password = password
         self.full_name = full_name
-        self.profile_picture = profile_picture
         self.posts = posts or []
         self.followers = followers or []
         self.following = following or []

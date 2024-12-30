@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
@@ -25,10 +25,6 @@ class User(BaseModel):
     email: str  
     password: str  
     full_name: Optional[str] = None  
-    profile_picture: Optional[str] = None
-    posts: Optional[List[str]] = Field(default_factory=list) 
-    followers: Optional[List[str]] = Field(default_factory=list) 
-    following: Optional[List[str]] = Field(default_factory=list) 
 
     @property
     def followers_count(self):
@@ -43,15 +39,22 @@ class User(BaseModel):
         return len(self.posts) 
 
 
-class GetUserByEmailRequest(BaseModel):
-    email: str
-
-class GetUserProfileRequest(BaseModel):
-    username: str
-
 class UpdateUserProfileRequest(BaseModel):
     user_id: str
-    update_data: Dict
+    update_data: Dict[str, Optional[str]] = Field(
+        default_factory=dict,
+        description="Fields to update, allowing only 'full_name', 'username' and 'email'."
+    )
+
+    @root_validator(pre=True)
+    def validate_update_data(cls, values):
+        update_data = values.get('update_data', {})
+        allowed_keys = {"full_name", "username", "email"}
+        for key in update_data.keys():
+            if key not in allowed_keys:
+                raise ValueError(f"Invalid key '{key}'. Only 'full_name', 'username' and 'email'  are allowed.")
+        return values
+
 
 class LoginRequest(BaseModel):
     email: str
@@ -66,7 +69,7 @@ class Post(BaseModel):
     media_url: str  
     music_url: Optional[str] = None  
     category: PostCategory 
-    posted_at: datetime  
+    posted_at: datetime
     publisher_id: str  
     likes: Optional[List[str]] = Field(default_factory=list)  
     comments: Optional[List[str]] = Field(default_factory=list)  

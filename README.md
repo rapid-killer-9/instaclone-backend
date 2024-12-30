@@ -28,7 +28,21 @@
 Create a `.env` file in the root directory with your environment variables, for example:
 ```sh
 MONGO_URI=mongodb+srv://<username>:<password>@cluster0.r38qj.mongodb.net/dev?retryWrites=true&w=majority&appName=Cluster0
-JWT_SECRET=your_secret_key
+JWT_SECRET_KEY=SecRet_KeY
+JWT_ALGORITHM=HS256
+```
+To Test application You can use. It will be active for 2 week for public IP 
+```sh
+MONGO_URI=mongodb+srv://hjha0695:8HCIDgs2CUFHAlJl@cluster0.r38qj.mongodb.net/dev?retryWrites=true&w=majority&appName=Cluster0
+```
+Test User
+```
+{
+  "username": "Test",
+  "email": "Test@gmail.com",
+  "password": "Test@1234",
+  "full_name": "Test Bot"
+}
 ```
 
 To run the FastAPI application, use the following command:

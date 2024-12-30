@@ -121,7 +121,7 @@ async def unfollow_user_by_username(username: str, current_user: str = Depends(g
 
 
 @router.get("/{user_id}/followers")
-async def get_followers_route(user_id: str):
+async def get_followers_route(user_id: str = Depends(get_current_user)):
     try:
         followers = await get_followers(user_id)
         return {"followers": followers}
@@ -130,7 +130,7 @@ async def get_followers_route(user_id: str):
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
 @router.get("/{user_id}/following")
-async def get_following_route(user_id: str):
+async def get_following_route(user_id: str = Depends(get_current_user)):
     try:
         following = await get_following(user_id)
         return {"following": following}

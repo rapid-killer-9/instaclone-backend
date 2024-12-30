@@ -27,6 +27,11 @@ async def follow_user(user_id: str, follow_user_id: str):
     db = await get_database()
     if not ObjectId.is_valid(user_id) or not ObjectId.is_valid(follow_user_id):
         raise ValueError("Invalid user ID format.")
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if ObjectId(follow_user_id) in user["following"]:
+        raise ValueError("User is already following the target user.")
+    if user_id == follow_user_id:
+        raise ValueError("User cannot follow itself.")
     
     await db.users.update_one(
         {"_id": ObjectId(user_id)},
@@ -39,8 +44,13 @@ async def follow_user(user_id: str, follow_user_id: str):
 
 async def unfollow_user(user_id: str, unfollow_user_id: str):
     db = await get_database()
+    # chek all the necessary conditions
     if not ObjectId.is_valid(user_id) or not ObjectId.is_valid(unfollow_user_id):
         raise ValueError("Invalid user ID format.")
+    if user_id == unfollow_user_id:
+        raise ValueError("User cannot unfollow itself.")
+    if ObjectId(unfollow_user_id) not in (await db.users.find_one({"_id": ObjectId(user_id)})["following"]):
+        raise ValueError("User is not following the target user.")
     
     await db.users.update_one(
         {"_id": ObjectId(user_id)},

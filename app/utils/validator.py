@@ -5,7 +5,7 @@ from bson import ObjectId
 
 def validate_email(email: str) -> bool:
     """
-    Validate an email address using regex.
+    Validate an email address using regex. 
     """
     regex = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$'
     return re.match(regex, email) is not None
@@ -26,6 +26,8 @@ def validate_password(password: str) -> bool:
         return False
     if not re.search(r'[a-z]', password):  # checks for lowercase letter
         return False
+    if not re.search(r'[^A-Za-z0-9]', password): # checks for special characters
+        return False
     return True
 
 
@@ -43,18 +45,6 @@ def validate_string_length(string: str, min_len: int = 1, max_len: int = 255) ->
     """
     return min_len <= len(string) <= max_len
 
-
-def validate_date(date_string: str) -> bool:
-    """
-    Validate if a string is a valid date in the format YYYY-MM-DD.
-    """
-    try:
-        datetime.strptime(date_string, "%Y-%m-%d")
-        return True
-    except ValueError:
-        return False
-
-
 def validate_object_id(id_string: str) -> bool:
     """
     Validate if the string is a valid MongoDB ObjectId.
@@ -64,3 +54,11 @@ def validate_object_id(id_string: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def validate_post_category(category: str, allowed_categories: list) -> bool:
+    """
+    Validates that a post category is within the allowed categories.
+    Returns True if the category is valid, False otherwise.
+    """
+    return category in allowed_categories

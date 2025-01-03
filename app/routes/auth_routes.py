@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from app.services.auth_service import authenticate_user, create_user
 from app.utils.auth import verify_token
-from app.models.pydantic import LoginRequest, VerifyTokenRequest, User
-from app.utils.validator import validate_email, validate_username, validate_string_length, validate_password
+from app.models.pydantic import UserCreateRequest, UserLoginRequest, VerifyTokenRequest
+from app.utils.user_validator import validate_email, validate_username, validate_string_length, validate_password
 
 router = APIRouter()
 
 @router.post("/create")
-async def create_new_user(user: User):
+async def create_new_user(user: UserCreateRequest):
     try:
         if not validate_email(user.email):
             raise HTTPException(status_code=400, detail="Invalid email.")
@@ -19,16 +19,12 @@ async def create_new_user(user: User):
             raise HTTPException(status_code=400, detail="Invalid password. Password must contain at least one uppercase letter, one lowercase letter, one digit, one special character, and be at least 8 characters long.")
         
         user_data = await create_user(user.email, user.password, user.full_name, user.username)
-        user_data.pop("password")
         return {"message": "User created successfully.", "user": user_data}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
 @router.post("/login")
-async def login(data: LoginRequest):
+async def login(data: UserLoginRequest):
 
     token = await authenticate_user(data.email, data.password)
 

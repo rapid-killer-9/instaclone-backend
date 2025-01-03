@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body, Depends
 from app.utils.auth import get_current_user
-from app.models.pydantic import UpdateUserProfileRequest
-from app.utils.validator import validate_email, validate_username, validate_string_length, validate_password
+from app.models.pydantic import UserUpdateRequest
+from app.utils.user_validator import validate_email, validate_username, validate_string_length, validate_password
 from app.services.user_service import (
     get_user_by_email, 
     get_user_by_username, 
@@ -39,11 +39,10 @@ async def get_user_profile(username: str):
         print(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred.")
 
-# protected route to update user profile fetch user id from token
-# and not allow to update other user profile
+
 @router.put("/profile/update")
-async def update_user_profile(data: UpdateUserProfileRequest, user_id: str = Depends(get_current_user)):
-    update_data = data.update_data
+async def update_user_profile(data: UserUpdateRequest, user_id: str = Depends(get_current_user)):
+    update_data = data.dict(exclude_unset=True)
     user_id = user_id["_id"]
     try:
         if not update_data:

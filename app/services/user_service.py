@@ -1,4 +1,5 @@
-from app.utils.db import get_database, serialize_document
+from app.utils.db import get_database
+from app.models.db import serialize_document
 from bson import ObjectId
 
 async def get_user_by_email(email: str):
@@ -44,7 +45,6 @@ async def follow_user(user_id: str, follow_user_id: str):
 
 async def unfollow_user(user_id: str, unfollow_user_id: str):
     db = await get_database()
-    # chek all the necessary conditions
     if not ObjectId.is_valid(user_id) or not ObjectId.is_valid(unfollow_user_id):
         raise ValueError("Invalid user ID format.")
     if user_id == unfollow_user_id:

@@ -5,7 +5,7 @@ from typing import Optional
 from app.config.settings import SECRET_KEY, ALGORITHM
 import hashlib, os
 from fastapi import Depends, HTTPException, Request
-from app.utils.db import serialize_document
+from app.models.db import serialize_document
 from app.services.user_service import get_user_by_email
 
 

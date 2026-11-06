@@ -96,3 +96,54 @@ async def delete_post(post_id: str, user_id: str) -> bool:
             {"$pull": {"tagged_posts": post_id}},
         )
     return True
+
+
+async def like_post(post_id: str, user_id: str) -> None:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise ValueError("Post not found.")
+    if user_id in post.get("likes", []):
+        raise ValueError("Post already liked.")
+    await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$addToSet": {"likes": user_id}},
+    )
+
+
+async def unlike_post(post_id: str, user_id: str) -> None:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise ValueError("Post not found.")
+    if user_id not in post.get("likes", []):
+        raise ValueError("Post not liked.")
+    await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$pull": {"likes": user_id}},
+    )
+
+
+async def add_comment(post_id: str, user_id: str, text: str) -> dict:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise ValueError("Post not found.")
+
+    comment = {
+        "_id": ObjectId(),
+        "user_id": user_id,
+        "text": text,
+        "created_at": datetime.utcnow(),
+    }
+    await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$push": {"comments": comment}},
+    )
+    return serialize_document(comment)

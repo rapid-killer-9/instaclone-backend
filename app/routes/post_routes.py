@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
-from app.models.pydantic import PostCreateRequest, PostCategory
+from app.models.pydantic import PostCreateRequest, CommentCreateRequest, PostCategory
 from app.utils.post_validator import (
     validate_category,
     validate_caption,
@@ -19,6 +19,9 @@ from app.services.post_service import (
     get_posts,
     get_feed,
     delete_post,
+    like_post,
+    unlike_post,
+    add_comment,
 )
 from app.services.user_service import get_user_by_username
 
@@ -111,3 +114,41 @@ async def delete_post_route(post_id: str, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=403, detail=str(e))
     if not found:
         raise HTTPException(status_code=404, detail="Post not found.")
+
+
+@router.post("/{post_id}/like", status_code=200)
+@limiter.limit("60/minute")
+async def like_post_route(
+    request: Request,
+    post_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        await like_post(post_id, current_user["_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"message": "Post liked."}
+
+
+@router.delete("/{post_id}/like", status_code=200)
+async def unlike_post_route(post_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        await unlike_post(post_id, current_user["_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"message": "Like removed."}
+
+
+@router.post("/{post_id}/comments", status_code=201)
+@limiter.limit("30/minute")
+async def add_comment_route(
+    request: Request,
+    post_id: str,
+    data: CommentCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        comment = await add_comment(post_id, current_user["_id"], data.text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"message": "Comment added.", "comment": comment}

@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from app.models.pydantic import PostCreateRequest
 from app.utils.post_validator import (
     validate_category,
@@ -10,6 +10,7 @@ from app.utils.post_validator import (
     validate_music_url,
 )
 from app.utils.auth import get_current_user
+from app.utils.rate_limit import limiter
 from app.services.post_service import create_post
 from app.services.user_service import get_user_by_username
 
@@ -17,7 +18,12 @@ router = APIRouter()
 
 
 @router.post("/", status_code=201)
-async def create_new_post(post: PostCreateRequest, current_user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def create_new_post(
+    request: Request,
+    post: PostCreateRequest,
+    current_user: dict = Depends(get_current_user),
+):
     user_id = current_user["_id"]
     if not validate_category(post.category):
         raise HTTPException(status_code=400, detail="Invalid category.")

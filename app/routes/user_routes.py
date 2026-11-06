@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from app.utils.auth import get_current_user
+from app.utils.rate_limit import limiter
 from app.models.pydantic import UserUpdateRequest
 from app.utils.user_validator import validate_email, validate_username, validate_string_length, validate_password
 from app.services.user_service import (
@@ -62,7 +63,12 @@ async def update_user_profile(
 
 
 @router.post("/follow/{username}")
-async def follow_user_by_username(username: str, current_user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def follow_user_by_username(
+    request: Request,
+    username: str,
+    current_user: dict = Depends(get_current_user),
+):
     target = await get_user_by_username(username)
     if not target:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -74,7 +80,12 @@ async def follow_user_by_username(username: str, current_user: dict = Depends(ge
 
 
 @router.post("/unfollow/{username}")
-async def unfollow_user_by_username(username: str, current_user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def unfollow_user_by_username(
+    request: Request,
+    username: str,
+    current_user: dict = Depends(get_current_user),
+):
     target = await get_user_by_username(username)
     if not target:
         raise HTTPException(status_code=404, detail="User not found.")

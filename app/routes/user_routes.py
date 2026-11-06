@@ -17,6 +17,12 @@ from app.services.user_service import (
 router = APIRouter()
 
 
+@router.get("/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    current_user.pop("password", None)
+    return {"user": current_user}
+
+
 @router.get("/get-by-email")
 async def get_user_by_email_route(email: str, _: dict = Depends(get_current_user)):
     user = await get_user_by_email(email)

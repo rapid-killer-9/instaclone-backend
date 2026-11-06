@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from app.utils.auth import get_current_user
 from app.utils.rate_limit import limiter
+from app.utils.pagination import PaginationParams
 from app.models.pydantic import UserUpdateRequest
 from app.utils.user_validator import validate_email, validate_username, validate_string_length, validate_password
 from app.services.user_service import (
@@ -97,18 +98,20 @@ async def unfollow_user_by_username(
 
 
 @router.get("/{user_id}/followers")
-async def get_followers_route(user_id: str):
+async def get_followers_route(user_id: str, pagination: PaginationParams = Depends()):
     try:
         followers = await get_followers(user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"followers": followers}
+    paginated = followers[pagination.skip: pagination.skip + pagination.limit]
+    return {"followers": paginated, "total": len(followers), "page": pagination.page, "limit": pagination.limit}
 
 
 @router.get("/{user_id}/following")
-async def get_following_route(user_id: str):
+async def get_following_route(user_id: str, pagination: PaginationParams = Depends()):
     try:
         following = await get_following(user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"following": following}
+    paginated = following[pagination.skip: pagination.skip + pagination.limit]
+    return {"following": paginated, "total": len(following), "page": pagination.page, "limit": pagination.limit}

@@ -1,17 +1,28 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.openapi.models import APIKey, APIKeyIn
 from fastapi.openapi.utils import get_openapi
 from app.routes import auth_routes, user_routes, post_routes
-app = FastAPI()
+from app.utils.db import init_db, close_db
+from app.config.settings import DATABASE_URL
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Instagram Clone Backend!"}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db(DATABASE_URL)
+    yield
+    close_db()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 app.include_router(user_routes.router, prefix="/users", tags=["Users"])
 app.include_router(post_routes.router, prefix="/posts", tags=["Posts"])
-# app.include_router(follow_routes.router, prefix="/follow", tags=["Follow"])
+
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Instagram Clone Backend!"}
 
 
 def custom_openapi():
@@ -35,5 +46,6 @@ def custom_openapi():
             method["security"] = [{"BearerAuth": []}]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
+
 
 app.openapi = custom_openapi

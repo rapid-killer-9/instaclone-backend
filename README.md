@@ -96,21 +96,27 @@ HTTP request
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/users/get-by-email` | No | Look up a user by email address |
+| GET | `/users/me` | Bearer | Get the current user's own profile |
+| GET | `/users/get-by-email` | Bearer | Look up a user by email address |
 | GET | `/users/profile/{username}` | No | Get public profile by username |
 | PUT | `/users/profile/update` | Bearer | Update own profile fields (partial update) |
-| POST | `/users/follow/` | Bearer | Follow a user by `target_user_id` query param |
 | POST | `/users/follow/{username}` | Bearer | Follow a user by username |
-| POST | `/users/unfollow/` | Bearer | Unfollow a user by `target_user_id` query param |
 | POST | `/users/unfollow/{username}` | Bearer | Unfollow a user by username |
-| GET | `/users/{user_id}/followers` | Bearer | List current user's followers |
-| GET | `/users/{user_id}/following` | Bearer | List users the current user follows |
+| GET | `/users/{user_id}/followers` | No | List a user's followers (paginated) |
+| GET | `/users/{user_id}/following` | No | List users a user follows (paginated) |
 
 ### Posts
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | POST | `/posts/` | Bearer | Create a new post (resolves tagged usernames to IDs) |
+| GET | `/posts/` | No | List posts, newest first; optional `?category=` filter; paginated |
+| GET | `/posts/feed` | Bearer | Personal feed: posts from users you follow, newest first; paginated |
+| GET | `/posts/{post_id}` | No | Get a single post by ID |
+| DELETE | `/posts/{post_id}` | Bearer | Delete own post; removes from publisher and tagged users |
+| POST | `/posts/{post_id}/like` | Bearer | Like a post |
+| DELETE | `/posts/{post_id}/like` | Bearer | Remove like from a post |
+| POST | `/posts/{post_id}/comments` | Bearer | Add a comment (embedded in post document) |
 
 ---
 
@@ -246,6 +252,6 @@ pytest
 
 ## Future Improvements
 
-- **Post read / update / delete endpoints** — `POST /posts/` is the only post route; there is no way to fetch, edit, or delete posts, or to list a user's feed.
-- **Like and comment endpoints** — `likes` and `comments` fields exist on the `PostDB` model and `CommentDB` is defined, but no routes expose them.
-- **Pagination and rate limiting** — follower/following lists load all documents into memory (`to_list(length=None)`); adding cursor-based pagination and a rate-limiting middleware (e.g. `slowapi`) would be needed before any production deployment.
+- **Post edit endpoint** — `PUT /posts/{post_id}` for updating caption, description, or hashtags is not yet implemented.
+- **Comment pagination** — comments are embedded in the post document; a high-comment post returns all of them in `GET /posts/{post_id}`. Migrating to a separate collection with cursor-based pagination would be needed at scale.
+- **Token refresh and revocation** — access tokens expire after 30 minutes with no refresh endpoint and no blocklist; a short-lived access + long-lived refresh token pair (or a Redis-backed blocklist) is the standard next step.

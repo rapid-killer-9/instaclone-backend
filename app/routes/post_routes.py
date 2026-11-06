@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
-from app.models.pydantic import PostCreateRequest
+from app.models.pydantic import PostCreateRequest, PostCategory
 from app.utils.post_validator import (
     validate_category,
     validate_caption,
@@ -11,7 +12,14 @@ from app.utils.post_validator import (
 )
 from app.utils.auth import get_current_user
 from app.utils.rate_limit import limiter
-from app.services.post_service import create_post
+from app.utils.pagination import PaginationParams
+from app.services.post_service import (
+    create_post,
+    get_post,
+    get_posts,
+    get_feed,
+    delete_post,
+)
 from app.services.user_service import get_user_by_username
 
 router = APIRouter()
@@ -59,3 +67,47 @@ async def create_new_post(
         return {"message": "Post created successfully.", "post": new_post}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/feed")
+async def get_feed_route(
+    current_user: dict = Depends(get_current_user),
+    pagination: PaginationParams = Depends(),
+):
+    try:
+        posts = await get_feed(current_user["_id"], pagination.skip, pagination.limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"posts": posts, "page": pagination.page, "limit": pagination.limit}
+
+
+@router.get("/")
+async def list_posts(
+    category: Optional[PostCategory] = None,
+    pagination: PaginationParams = Depends(),
+):
+    posts = await get_posts(pagination.skip, pagination.limit, category.value if category else None)
+    return {"posts": posts, "page": pagination.page, "limit": pagination.limit}
+
+
+@router.get("/{post_id}")
+async def get_post_route(post_id: str):
+    try:
+        post = await get_post(post_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found.")
+    return {"post": post}
+
+
+@router.delete("/{post_id}", status_code=204)
+async def delete_post_route(post_id: str, current_user: dict = Depends(get_current_user)):
+    try:
+        found = await delete_post(post_id, current_user["_id"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    if not found:
+        raise HTTPException(status_code=404, detail="Post not found.")

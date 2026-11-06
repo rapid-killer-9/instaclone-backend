@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from bson import ObjectId
 from app.utils.db import get_database
 from app.models.db import PostDB, serialize_document
@@ -36,3 +37,62 @@ async def create_post(post_data: dict) -> dict:
 
     post_db._id = post_id
     return serialize_document(post_db.to_dict())
+
+
+async def get_post(post_id: str) -> Optional[dict]:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    return serialize_document(post)
+
+
+async def get_posts(skip: int, limit: int, category: Optional[str] = None) -> list:
+    db = get_database()
+    query = {"category": category} if category else {}
+    cursor = db.posts.find(query).sort("posted_at", -1).skip(skip).limit(limit)
+    return serialize_document(await cursor.to_list(length=limit))
+
+
+async def get_user_posts(user_id: str, skip: int, limit: int) -> list:
+    db = get_database()
+    cursor = db.posts.find({"publisher_id": user_id}).sort("posted_at", -1).skip(skip).limit(limit)
+    return serialize_document(await cursor.to_list(length=limit))
+
+
+async def get_feed(user_id: str, skip: int, limit: int) -> list:
+    """Return posts from users the given user follows, newest first."""
+    db = get_database()
+    if not ObjectId.is_valid(user_id):
+        raise ValueError("Invalid user ID.")
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise ValueError("User not found.")
+
+    # following is stored as ObjectIds; publisher_id in posts is stored as string
+    following_ids = [str(oid) for oid in user.get("following", [])]
+    cursor = db.posts.find({"publisher_id": {"$in": following_ids}}).sort("posted_at", -1).skip(skip).limit(limit)
+    return serialize_document(await cursor.to_list(length=limit))
+
+
+async def delete_post(post_id: str, user_id: str) -> bool:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        return False
+    if str(post["publisher_id"]) != user_id:
+        raise PermissionError("Not authorised to delete this post.")
+
+    await db.posts.delete_one({"_id": ObjectId(post_id)})
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$pull": {"posts": post_id}},
+    )
+    for tagged_id in post.get("tagged_users", []):
+        await db.users.update_one(
+            {"_id": ObjectId(tagged_id)},
+            {"$pull": {"tagged_posts": post_id}},
+        )
+    return True

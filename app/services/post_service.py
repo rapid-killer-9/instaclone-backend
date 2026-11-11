@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from bson import ObjectId
+from pymongo import ReturnDocument
 from app.utils.db import get_database
 from app.models.db import PostDB, serialize_document
 
@@ -88,6 +89,31 @@ async def delete_post(post_id: str, user_id: str) -> bool:
             {"$pull": {"tagged_posts": post_id}},
         )
     return True
+
+
+_ALLOWED_POST_UPDATE_FIELDS = {"caption", "description", "hashtags"}
+
+
+async def update_post(post_id: str, user_id: str, update_data: dict) -> dict:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise ValueError("Post not found.")
+    if str(post["publisher_id"]) != user_id:
+        raise PermissionError("Not authorised to edit this post.")
+
+    safe = {k: v for k, v in update_data.items() if k in _ALLOWED_POST_UPDATE_FIELDS}
+    if not safe:
+        raise ValueError("No valid fields to update.")
+
+    updated = await db.posts.find_one_and_update(
+        {"_id": ObjectId(post_id)},
+        {"$set": safe},
+        return_document=ReturnDocument.AFTER,
+    )
+    return serialize_document(updated)
 
 
 async def like_post(post_id: str, user_id: str) -> None:

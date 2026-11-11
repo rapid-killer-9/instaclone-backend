@@ -48,5 +48,13 @@ class PostCreateRequest(BaseModel):
     tagged_users: Optional[List[str]] = Field(default_factory=list)
 
 
+class PostUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    caption: Optional[str] = None
+    description: Optional[str] = None
+    hashtags: Optional[List[str]] = None
+
+
 class CommentCreateRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)

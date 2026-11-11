@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
-from app.models.pydantic import PostCreateRequest, CommentCreateRequest, PostCategory
+from app.models.pydantic import PostCreateRequest, PostUpdateRequest, CommentCreateRequest, PostCategory
 from app.utils.post_validator import (
     validate_caption,
     validate_description,
@@ -14,6 +14,7 @@ from app.utils.rate_limit import limiter
 from app.utils.pagination import PaginationParams
 from app.services.post_service import (
     create_post,
+    update_post,
     get_post,
     get_posts,
     get_feed,
@@ -99,6 +100,30 @@ async def get_post_route(post_id: str):
     if not post:
         raise HTTPException(status_code=404, detail="Post not found.")
     return {"post": post}
+
+
+@router.put("/{post_id}")
+async def update_post_route(
+    post_id: str,
+    data: PostUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    update_data = data.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields provided for update.")
+    if "caption" in update_data and not validate_caption(update_data["caption"]):
+        raise HTTPException(status_code=400, detail="Caption must be non-empty and at most 100 characters.")
+    if "description" in update_data and update_data["description"] and not validate_description(update_data["description"]):
+        raise HTTPException(status_code=400, detail="Description must be at most 500 characters.")
+    if "hashtags" in update_data and update_data["hashtags"] and not validate_hashtags(update_data["hashtags"]):
+        raise HTTPException(status_code=400, detail="Provide at most 10 hashtags, each at most 20 characters.")
+    try:
+        updated = await update_post(post_id, current_user["_id"], update_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    return {"message": "Post updated.", "post": updated}
 
 
 @router.delete("/{post_id}", status_code=204)

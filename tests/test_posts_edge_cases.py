@@ -270,3 +270,78 @@ async def test_feed_beyond_total_returns_empty(client, auth_headers, second_auth
     resp = await client.get("/posts/feed", headers=auth_headers, params={"page": 999, "limit": 20})
     assert resp.status_code == 200
     assert resp.json()["posts"] == []
+
+
+# ── post edit ─────────────────────────────────────────────────────────────────
+
+async def test_edit_post_caption(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"caption": "Updated caption"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["post"]["caption"] == "Updated caption"
+
+
+async def test_edit_post_description(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"description": "New description"}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["post"]["description"] == "New description"
+
+
+async def test_edit_post_hashtags(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"hashtags": ["newtag", "another"]}, headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.json()["post"]["hashtags"] == ["newtag", "another"]
+
+
+async def test_edit_post_non_owner_rejected(client, auth_headers, second_auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"caption": "Hacked"}, headers=second_auth_headers)
+    assert resp.status_code == 403
+
+
+async def test_edit_post_unauthenticated_rejected(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"caption": "No auth"})
+    assert resp.status_code == 401
+
+
+async def test_edit_post_invalid_caption_rejected(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"caption": "x" * 101}, headers=auth_headers)
+    assert resp.status_code == 400
+
+
+async def test_edit_post_whitespace_caption_rejected(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"caption": "   "}, headers=auth_headers)
+    assert resp.status_code == 400
+
+
+async def test_edit_post_invalid_hashtags_rejected(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"hashtags": ["tag"] * 11}, headers=auth_headers)
+    assert resp.status_code == 400
+
+
+async def test_edit_post_no_fields_rejected(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={}, headers=auth_headers)
+    assert resp.status_code == 400
+
+
+async def test_edit_post_extra_field_rejected(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.put(f"/posts/{post_id}", json={"publisher_id": "attacker"}, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+async def test_edit_post_nonexistent_rejected(client, auth_headers):
+    resp = await client.put("/posts/000000000000000000000000", json={"caption": "test"}, headers=auth_headers)
+    assert resp.status_code == 400
+
+
+async def test_edit_post_invalid_id_rejected(client, auth_headers):
+    resp = await client.put("/posts/not-an-id", json={"caption": "test"}, headers=auth_headers)
+    assert resp.status_code == 400

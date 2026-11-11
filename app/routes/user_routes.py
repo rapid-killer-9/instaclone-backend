@@ -55,8 +55,6 @@ async def update_user_profile(
         raise HTTPException(status_code=400, detail="Invalid password format.")
     if "username" in update_data and not validate_username(update_data["username"]):
         raise HTTPException(status_code=400, detail="Invalid username format.")
-    if "email" in update_data and not validate_email(update_data["email"]):
-        raise HTTPException(status_code=400, detail="Invalid email format.")
 
     try:
         updated_user = await update_user(current_user["_id"], update_data)
@@ -106,18 +104,16 @@ async def unfollow_user_by_username(
 @router.get("/{user_id}/followers")
 async def get_followers_route(user_id: str, pagination: PaginationParams = Depends()):
     try:
-        followers = await get_followers(user_id)
+        followers, total = await get_followers(user_id, pagination.skip, pagination.limit)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    paginated = followers[pagination.skip: pagination.skip + pagination.limit]
-    return {"followers": paginated, "total": len(followers), "page": pagination.page, "limit": pagination.limit}
+    return {"followers": followers, "total": total, "page": pagination.page, "limit": pagination.limit}
 
 
 @router.get("/{user_id}/following")
 async def get_following_route(user_id: str, pagination: PaginationParams = Depends()):
     try:
-        following = await get_following(user_id)
+        following, total = await get_following(user_id, pagination.skip, pagination.limit)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    paginated = following[pagination.skip: pagination.skip + pagination.limit]
-    return {"following": paginated, "total": len(following), "page": pagination.page, "limit": pagination.limit}
+    return {"following": following, "total": total, "page": pagination.page, "limit": pagination.limit}

@@ -3,7 +3,7 @@ from app.services.auth_service import authenticate_user, create_user
 from app.utils.auth import verify_token
 from app.utils.rate_limit import limiter
 from app.models.pydantic import UserCreateRequest, UserLoginRequest, VerifyTokenRequest
-from app.utils.user_validator import validate_email, validate_username, validate_string_length, validate_password
+from app.utils.user_validator import validate_username, validate_string_length, validate_password
 
 router = APIRouter()
 
@@ -11,8 +11,6 @@ router = APIRouter()
 @router.post("/create", status_code=201)
 @limiter.limit("10/minute")
 async def create_new_user(request: Request, user: UserCreateRequest):
-    if not validate_email(user.email):
-        raise HTTPException(status_code=400, detail="Invalid email format.")
     if not validate_username(user.username):
         raise HTTPException(status_code=400, detail="Username must be 3–30 characters and contain only letters, digits, underscores, or hyphens.")
     if not validate_string_length(user.full_name, min_len=1, max_len=100):

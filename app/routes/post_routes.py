@@ -3,7 +3,6 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
 from app.models.pydantic import PostCreateRequest, CommentCreateRequest, PostCategory
 from app.utils.post_validator import (
-    validate_category,
     validate_caption,
     validate_description,
     validate_hashtags,
@@ -36,8 +35,6 @@ async def create_new_post(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["_id"]
-    if not validate_category(post.category):
-        raise HTTPException(status_code=400, detail="Invalid category.")
     if not validate_caption(post.caption):
         raise HTTPException(status_code=400, detail="Caption must be non-empty and at most 100 characters.")
     if post.description and not validate_description(post.description):

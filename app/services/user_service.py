@@ -1,5 +1,6 @@
 import bcrypt
 from bson import ObjectId
+from pymongo import ReturnDocument
 from app.utils.db import get_database
 from app.models.db import serialize_document
 
@@ -29,6 +30,16 @@ async def update_user(user_id: str, update_data: dict) -> dict | None:
     if not ObjectId.is_valid(user_id):
         raise ValueError("Invalid user ID format.")
 
+    if "email" in update_data:
+        existing = await db.users.find_one({"email": update_data["email"], "_id": {"$ne": ObjectId(user_id)}})
+        if existing:
+            raise ValueError("Email already in use.")
+
+    if "username" in update_data:
+        existing = await db.users.find_one({"username": update_data["username"], "_id": {"$ne": ObjectId(user_id)}})
+        if existing:
+            raise ValueError("Username already in use.")
+
     if "password" in update_data:
         update_data["password"] = bcrypt.hashpw(
             update_data["password"].encode("utf-8"), bcrypt.gensalt()
@@ -37,7 +48,7 @@ async def update_user(user_id: str, update_data: dict) -> dict | None:
     updated_user = await db.users.find_one_and_update(
         {"_id": ObjectId(user_id)},
         {"$set": update_data},
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
     return serialize_document(updated_user)
 
@@ -92,23 +103,33 @@ async def unfollow_user(user_id: str, unfollow_user_id: str) -> None:
     )
 
 
-async def get_followers(user_id: str) -> list:
+async def get_followers(user_id: str, skip: int, limit: int) -> tuple[list, int]:
     db = get_database()
     if not ObjectId.is_valid(user_id):
         raise ValueError("Invalid user ID format.")
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    user = await db.users.find_one({"_id": ObjectId(user_id)}, {"followers": 1})
     if not user:
         raise ValueError("User not found.")
-    docs = await db.users.find({"_id": {"$in": user.get("followers", [])}}).to_list(length=None)
-    return [{"_id": str(d["_id"]), "username": d["username"], "full_name": d["full_name"]} for d in docs]
+    follower_ids = user.get("followers", [])
+    total = len(follower_ids)
+    docs = await db.users.find(
+        {"_id": {"$in": follower_ids}},
+        {"username": 1, "full_name": 1},
+    ).skip(skip).limit(limit).to_list(length=limit)
+    return [{"_id": str(d["_id"]), "username": d["username"], "full_name": d["full_name"]} for d in docs], total
 
 
-async def get_following(user_id: str) -> list:
+async def get_following(user_id: str, skip: int, limit: int) -> tuple[list, int]:
     db = get_database()
     if not ObjectId.is_valid(user_id):
         raise ValueError("Invalid user ID format.")
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    user = await db.users.find_one({"_id": ObjectId(user_id)}, {"following": 1})
     if not user:
         raise ValueError("User not found.")
-    docs = await db.users.find({"_id": {"$in": user.get("following", [])}}).to_list(length=None)
-    return [{"_id": str(d["_id"]), "username": d["username"], "full_name": d["full_name"]} for d in docs]
+    following_ids = user.get("following", [])
+    total = len(following_ids)
+    docs = await db.users.find(
+        {"_id": {"$in": following_ids}},
+        {"username": 1, "full_name": 1},
+    ).skip(skip).limit(limit).to_list(length=limit)
+    return [{"_id": str(d["_id"]), "username": d["username"], "full_name": d["full_name"]} for d in docs], total

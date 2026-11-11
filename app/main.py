@@ -8,6 +8,16 @@ from app.utils.db import init_db, close_db
 from app.utils.rate_limit import limiter
 from app.config.settings import DATABASE_URL
 
+_PUBLIC_ROUTES = {
+    ("get", "/"),
+    ("post", "/auth/create"),
+    ("post", "/auth/login"),
+    ("post", "/auth/verify-token"),
+    ("get", "/posts/"),
+    ("get", "/posts/{post_id}"),
+    ("get", "/users/profile/{username}"),
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,7 +26,7 @@ async def lifespan(app: FastAPI):
     close_db()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, redoc_url=None)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -46,9 +56,10 @@ def custom_openapi():
             "bearerFormat": "JWT",
         }
     }
-    for path in openapi_schema["paths"].values():
-        for method in path.values():
-            method["security"] = [{"BearerAuth": []}]
+    for path, path_item in openapi_schema["paths"].items():
+        for method, operation in path_item.items():
+            if (method.lower(), path) not in _PUBLIC_ROUTES:
+                operation["security"] = [{"BearerAuth": []}]
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 

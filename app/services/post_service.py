@@ -54,14 +54,7 @@ async def get_posts(skip: int, limit: int, category: Optional[str] = None) -> li
     return serialize_document(await cursor.to_list(length=limit))
 
 
-async def get_user_posts(user_id: str, skip: int, limit: int) -> list:
-    db = get_database()
-    cursor = db.posts.find({"publisher_id": user_id}).sort("posted_at", -1).skip(skip).limit(limit)
-    return serialize_document(await cursor.to_list(length=limit))
-
-
 async def get_feed(user_id: str, skip: int, limit: int) -> list:
-    """Return posts from users the given user follows, newest first."""
     db = get_database()
     if not ObjectId.is_valid(user_id):
         raise ValueError("Invalid user ID.")
@@ -69,7 +62,6 @@ async def get_feed(user_id: str, skip: int, limit: int) -> list:
     if not user:
         raise ValueError("User not found.")
 
-    # following is stored as ObjectIds; publisher_id in posts is stored as string
     following_ids = [str(oid) for oid in user.get("following", [])]
     cursor = db.posts.find({"publisher_id": {"$in": following_ids}}).sort("posted_at", -1).skip(skip).limit(limit)
     return serialize_document(await cursor.to_list(length=limit))

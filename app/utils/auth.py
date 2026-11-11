@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta
 from typing import Optional
-import hashlib
-import os
 import jwt
 from jwt import PyJWTError
 from fastapi import HTTPException, Request
@@ -12,8 +10,7 @@ from app.models.db import serialize_document
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=30))
-    salt = hashlib.sha256(os.urandom(60)).hexdigest()
-    to_encode.update({"salt": salt, "exp": expire})
+    to_encode["exp"] = expire
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 

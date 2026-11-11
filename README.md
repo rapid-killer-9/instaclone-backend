@@ -13,7 +13,8 @@ A RESTful API for a social media platform with user authentication, follow graph
 | Database | MongoDB (Motor — async driver) |
 | Auth | PyJWT + bcrypt |
 | Validation | Pydantic v2 |
-| Testing | pytest + pytest-asyncio + mongomock |
+| Rate limiting | slowapi (in-memory, per-route) |
+| Testing | pytest + pytest-asyncio + httpx (real MongoDB test DB) |
 | API Docs | Swagger UI / ReDoc (built-in) |
 
 ---
@@ -26,6 +27,8 @@ A RESTful API for a social media platform with user authentication, follow graph
 - **Post creation with tagging** — posts resolve tagged usernames to IDs at write time and update each tagged user's `tagged_posts` list
 - **Categorised content** — posts are assigned to one of seven categories (Tech, Entertainment, Business, Sports, Music, Art, Education) enforced by an enum
 - **Layered validation** — Pydantic validates types at the boundary; custom validators enforce business rules (password complexity, username format, caption/hashtag length, URL scheme)
+- **Rate limiting** — slowapi guards write-heavy endpoints (registration, login, post creation, likes) with per-minute limits backed by in-memory storage
+- **Privilege escalation prevention** — `UserUpdateRequest` and `PostUpdateRequest` use `extra='forbid'` so unknown fields (e.g. `is_admin`, `posts`, `followers`) are rejected with 422 at the Pydantic boundary; a service-level allowlist provides defence-in-depth
 
 ---
 
@@ -43,7 +46,7 @@ instaclone-backend/
 │   ├── routes/
 │   │   ├── auth_routes.py     # POST /auth/create, /auth/login, /auth/verify-token
 │   │   ├── user_routes.py     # GET/PUT profile, follow/unfollow, followers/following
-│   │   └── post_routes.py     # POST /posts/
+│   │   └── post_routes.py     # CRUD posts, like/unlike, comments, feed
 │   ├── services/
 │   │   ├── auth_service.py    # create_user, authenticate_user
 │   │   ├── user_service.py    # CRUD + follow graph mutations
@@ -91,6 +94,7 @@ HTTP request
 | POST | `/auth/create` | No | Register a new user; returns user info + access token |
 | POST | `/auth/login` | No | Authenticate with email + password; returns access token |
 | POST | `/auth/verify-token` | No | Validate a JWT; returns user_id on success |
+| POST | `/auth/refresh` | Bearer | Issue a new token from a valid existing token; no credentials required |
 
 ### Users
 
@@ -113,10 +117,12 @@ HTTP request
 | GET | `/posts/` | No | List posts, newest first; optional `?category=` filter; paginated |
 | GET | `/posts/feed` | Bearer | Personal feed: posts from users you follow, newest first; paginated |
 | GET | `/posts/{post_id}` | No | Get a single post by ID |
+| PUT | `/posts/{post_id}` | Bearer | Edit own post's caption, description, or hashtags |
 | DELETE | `/posts/{post_id}` | Bearer | Delete own post; removes from publisher and tagged users |
 | POST | `/posts/{post_id}/like` | Bearer | Like a post |
 | DELETE | `/posts/{post_id}/like` | Bearer | Remove like from a post |
 | POST | `/posts/{post_id}/comments` | Bearer | Add a comment (embedded in post document) |
+| GET | `/posts/{post_id}/comments` | No | Paginated list of comments for a post |
 
 ---
 
@@ -151,8 +157,8 @@ HTTP request
 | `music_url` | string? | optional, same URL scheme constraint |
 | `hashtags` | string[] | max 10 tags, each max 20 chars |
 | `tagged_users` | string[] | resolved from usernames to user `_id`s |
-| `likes` | string[] | user IDs (populated by future endpoint) |
-| `comments` | string[] | comment records (populated by future endpoint) |
+| `likes` | string[] | user IDs of users who liked the post |
+| `comments` | object[] | embedded comment records `{user_id, text, commented_at}` |
 | `posted_at` | datetime | set server-side at creation |
 
 ### Entity Relationships
@@ -240,18 +246,28 @@ All endpoints require a Bearer token in Swagger — click **Authorize** and past
 
 ### Tests
 
-`pytest` and `mongomock` are listed as dependencies for in-memory MongoDB testing.
+Tests use a real MongoDB instance pointed at the `instaclone_test` database (isolated from the dev database). Each test run drops `users` and `posts` collections before the test via a fixture, and rate limiter state is reset between tests.
 
 ```sh
-pytest
+# Requires a running MongoDB instance (default: localhost:27017)
+python -m pytest tests/
 ```
 
-> **Note:** No test files are present in the repository yet. The test infrastructure is wired but tests need to be written.
+The suite has 193 tests across six files:
+
+| File | Coverage |
+|---|---|
+| `tests/test_auth.py` | Registration, login, token verification — happy paths |
+| `tests/test_auth_edge_cases.py` | Password/username/full-name boundaries, JWT security (tampered, expired, missing claims), header format variants, token refresh |
+| `tests/test_posts.py` | Post CRUD, likes, comments, feed — happy paths |
+| `tests/test_posts_edge_cases.py` | Caption/description/hashtag boundaries, URL scheme, category enum, pagination slicing, post edit, comment pagination |
+| `tests/test_users.py` | Profile update, follow graph, paginated follower/following lists — happy paths |
+| `tests/test_users_edge_cases.py` | Field validation boundaries, follow/unfollow cycles, mutual follow, sensitive field exclusion, field injection prevention |
 
 ---
 
 ## Future Improvements
 
-- **Post edit endpoint** — `PUT /posts/{post_id}` for updating caption, description, or hashtags is not yet implemented.
-- **Comment pagination** — comments are embedded in the post document; a high-comment post returns all of them in `GET /posts/{post_id}`. Migrating to a separate collection with cursor-based pagination would be needed at scale.
-- **Token refresh and revocation** — access tokens expire after 30 minutes with no refresh endpoint and no blocklist; a short-lived access + long-lived refresh token pair (or a Redis-backed blocklist) is the standard next step.
+- **Comment storage migration** — comments are embedded in the post document and paginated in-memory by the service. At scale (thousands of comments per post) a dedicated `comments` collection with a `post_id` index and server-side cursor-based pagination would be more efficient.
+- **Token revocation** — `POST /auth/refresh` issues a fresh token but there is no blocklist; a compromised token remains valid until expiry. A Redis-backed token blocklist or a short-lived access + long-lived refresh token pair would plug this gap.
+- **Distributed rate limiting** — the current slowapi setup uses in-memory storage, which resets on process restart and does not work across multiple workers. Switching to a Redis backend would give persistent, cross-process limits.

@@ -22,6 +22,3 @@ def validate_media_url(media_url: str) -> bool:
 def validate_music_url(music_url: str) -> bool:
     regex = r'^(http|https)://'
     return re.match(regex, music_url) is not None
-
-def validate_category(category: str) -> bool:
-    return category in ["Tech", "Entertainment", "Business", "Sports", "Music", "Art", "Education"]

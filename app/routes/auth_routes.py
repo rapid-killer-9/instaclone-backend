@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from app.services.auth_service import authenticate_user, create_user
-from app.utils.auth import verify_token
+from app.utils.auth import verify_token, create_access_token, get_current_user
 from app.utils.rate_limit import limiter
 from app.models.pydantic import UserCreateRequest, UserLoginRequest, VerifyTokenRequest
 from app.utils.user_validator import validate_username, validate_string_length, validate_password
@@ -41,3 +41,13 @@ async def verify_token_route(data: VerifyTokenRequest):
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     return {"message": "Token is valid.", "user_id": payload.get("user_id")}
+
+
+@router.post("/refresh")
+async def refresh_token(current_user: dict = Depends(get_current_user)):
+    token = create_access_token({
+        "user_id": current_user["_id"],
+        "username": current_user["username"],
+        "email": current_user["email"],
+    })
+    return {"access_token": token, "token_type": "bearer"}

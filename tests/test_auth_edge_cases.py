@@ -250,3 +250,23 @@ async def test_verify_token_empty_string(client):
 async def test_verify_token_missing_field(client):
     resp = await client.post("/auth/verify-token", json={})
     assert resp.status_code == 422
+
+
+# ── token refresh ─────────────────────────────────────────────────────────────
+
+async def test_refresh_token_returns_new_token(client, auth_headers):
+    resp = await client.post("/auth/refresh", headers=auth_headers)
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
+    assert resp.json()["token_type"] == "bearer"
+
+
+async def test_refresh_token_new_token_authenticates(client, auth_headers):
+    new_token = (await client.post("/auth/refresh", headers=auth_headers)).json()["access_token"]
+    me_resp = await client.get("/users/me", headers={"Authorization": f"Bearer {new_token}"})
+    assert me_resp.status_code == 200
+
+
+async def test_refresh_token_unauthenticated_rejected(client):
+    resp = await client.post("/auth/refresh")
+    assert resp.status_code == 401

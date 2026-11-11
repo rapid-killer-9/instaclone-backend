@@ -18,6 +18,7 @@ from app.services.post_service import (
     get_post,
     get_posts,
     get_feed,
+    get_comments,
     delete_post,
     like_post,
     unlike_post,
@@ -136,6 +137,18 @@ async def delete_post_route(post_id: str, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=403, detail=str(e))
     if not found:
         raise HTTPException(status_code=404, detail="Post not found.")
+
+
+@router.get("/{post_id}/comments")
+async def get_comments_route(
+    post_id: str,
+    pagination: PaginationParams = Depends(),
+):
+    try:
+        comments, total = await get_comments(post_id, pagination.skip, pagination.limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"comments": comments, "total": total, "page": pagination.page, "limit": pagination.limit}
 
 
 @router.post("/{post_id}/like", status_code=200)

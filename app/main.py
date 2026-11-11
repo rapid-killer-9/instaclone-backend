@@ -15,6 +15,7 @@ _PUBLIC_ROUTES = {
     ("post", "/auth/verify-token"),
     ("get", "/posts/"),
     ("get", "/posts/{post_id}"),
+    ("get", "/posts/{post_id}/comments"),
     ("get", "/users/profile/{username}"),
 }
 

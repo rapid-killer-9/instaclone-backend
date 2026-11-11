@@ -116,6 +116,18 @@ async def update_post(post_id: str, user_id: str, update_data: dict) -> dict:
     return serialize_document(updated)
 
 
+async def get_comments(post_id: str, skip: int, limit: int) -> tuple[list, int]:
+    db = get_database()
+    if not ObjectId.is_valid(post_id):
+        raise ValueError("Invalid post ID.")
+    post = await db.posts.find_one({"_id": ObjectId(post_id)}, {"comments": 1})
+    if not post:
+        raise ValueError("Post not found.")
+    comments = post.get("comments", [])
+    total = len(comments)
+    return serialize_document(comments[skip: skip + limit]), total
+
+
 async def like_post(post_id: str, user_id: str) -> None:
     db = get_database()
     if not ObjectId.is_valid(post_id):

@@ -345,3 +345,36 @@ async def test_edit_post_nonexistent_rejected(client, auth_headers):
 async def test_edit_post_invalid_id_rejected(client, auth_headers):
     resp = await client.put("/posts/not-an-id", json={"caption": "test"}, headers=auth_headers)
     assert resp.status_code == 400
+
+
+# ── comment pagination ────────────────────────────────────────────────────────
+
+async def test_get_comments_empty(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    resp = await client.get(f"/posts/{post_id}/comments")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
+    assert resp.json()["comments"] == []
+
+
+async def test_get_comments_paginated(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    for i in range(5):
+        await client.post(f"/posts/{post_id}/comments", json={"text": f"Comment {i}"}, headers=auth_headers)
+
+    page1 = (await client.get(f"/posts/{post_id}/comments", params={"page": 1, "limit": 2})).json()
+    page2 = (await client.get(f"/posts/{post_id}/comments", params={"page": 2, "limit": 2})).json()
+    page3 = (await client.get(f"/posts/{post_id}/comments", params={"page": 3, "limit": 2})).json()
+
+    assert page1["total"] == 5
+    assert len(page1["comments"]) == 2
+    assert len(page2["comments"]) == 2
+    assert len(page3["comments"]) == 1
+
+
+async def test_get_comments_beyond_total_returns_empty(client, auth_headers):
+    post_id = await _make_post(client, auth_headers)
+    await client.post(f"/posts/{post_id}/comments", json={"text": "Just one"}, headers=auth_headers)
+    resp = await client.get(f"/posts/{post_id}/comments", params={"page": 999, "limit": 20})
+    assert resp.status_code == 200
+    assert resp.json()["comments"] == []

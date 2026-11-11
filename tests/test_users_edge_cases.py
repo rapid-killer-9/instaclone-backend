@@ -229,3 +229,21 @@ async def test_get_by_email_hides_password(client, auth_headers):
     resp = await client.get("/users/get-by-email", params={"email": USER_A["email"]}, headers=auth_headers)
     assert resp.status_code == 200
     assert "password" not in resp.json()["user"]
+
+
+# ── security — profile update field injection ─────────────────────────────────
+
+async def test_update_unknown_field_rejected(client, auth_headers):
+    """Unknown fields must be rejected with 422, not silently ignored."""
+    resp = await client.put("/users/profile/update", json={"is_admin": True}, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+async def test_update_posts_field_injection_rejected(client, auth_headers):
+    resp = await client.put("/users/profile/update", json={"posts": ["fake-post-id"]}, headers=auth_headers)
+    assert resp.status_code == 422
+
+
+async def test_update_followers_field_injection_rejected(client, auth_headers):
+    resp = await client.put("/users/profile/update", json={"followers": ["attacker-id"]}, headers=auth_headers)
+    assert resp.status_code == 422

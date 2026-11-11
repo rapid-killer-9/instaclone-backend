@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional, List
 from enum import Enum
 
@@ -20,6 +20,8 @@ class VerifyTokenRequest(BaseModel):
 
 
 class UserUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     full_name: Optional[str] = None
     username: Optional[str] = None
     email: Optional[EmailStr] = None

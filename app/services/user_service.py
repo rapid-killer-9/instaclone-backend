@@ -25,10 +25,17 @@ async def get_user_by_username(username: str) -> dict | None:
     return serialize_document(user)
 
 
+_ALLOWED_UPDATE_FIELDS = {"full_name", "username", "email", "password"}
+
+
 async def update_user(user_id: str, update_data: dict) -> dict | None:
     db = get_database()
     if not ObjectId.is_valid(user_id):
         raise ValueError("Invalid user ID format.")
+
+    update_data = {k: v for k, v in update_data.items() if k in _ALLOWED_UPDATE_FIELDS}
+    if not update_data:
+        raise ValueError("No valid fields to update.")
 
     if "email" in update_data:
         existing = await db.users.find_one({"email": update_data["email"], "_id": {"$ne": ObjectId(user_id)}})
